@@ -3,6 +3,9 @@ from pyzbar import pyzbar
 
 # Initialize the webcam
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_AUTOFOCUS, 0) # turn the autofocus off
+# cap.set(cv2.CAP_PROP_FOCUS, 100) # turn the autofocus off
+update_focus = 0
 
 # Check if the webcam is opened correctly
 if not cap.isOpened():
@@ -10,6 +13,11 @@ if not cap.isOpened():
     exit()
 
 print("Press 'q' to exit the webcam feed.")
+print("Press 'Up Arrow' to increase focus.")
+print("Press 'Down Arrow' to decrease focus")
+print("-------------- CAP SETTING --------------")
+print("AUTO FOCUS : ", cap.get(cv2.CAP_PROP_AUTOFOCUS))
+print("FOCUS : ", cap.get(cv2.CAP_PROP_FOCUS))
 
 while True:
     # Capture frame-by-frame from the webcam
@@ -45,8 +53,21 @@ while True:
     cv2.imshow("Barcode Scanner", frame)
 
     # Exit the loop if the user presses the 'q' key
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    key = cv2.waitKey(1)
+    if key == ord('q'):
         break
+    elif key == ord('w'): # Up Arrow Key (increase focus)
+        current_focus = update_focus
+        new_focus = min(current_focus + 10, 255) # Increase focus, max value is 255
+        update_focus = new_focus
+        cap.set(cv2.CAP_PROP_FOCUS, update_focus)
+        print("Increase focus from {} to {}.".format(current_focus, new_focus))
+    elif key == ord('s'): # Down Arroy key (decase focus)
+        current_focus = update_focus
+        new_focus = max(current_focus - 10, 0) # Decrease focus, max value is 255
+        update_focus = new_focus
+        cap.set(cv2.CAP_PROP_FOCUS, update_focus)
+        print("Decrease focus from {} to {}.".format(current_focus, new_focus))
 
 # Release the webcam and close all OpenCV windows
 cap.release()
