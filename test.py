@@ -1,11 +1,12 @@
 import cv2
 from pyzbar import pyzbar
 
+# Global variables
+NAMED_WINDOW = "Barcode Reader" 
+
 # Initialize the webcam
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 cap.set(cv2.CAP_PROP_AUTOFOCUS, 0) # turn the autofocus off
-# cap.set(cv2.CAP_PROP_FOCUS, 100) # turn the autofocus off
-update_focus = 0
 
 # Check if the webcam is opened correctly
 if not cap.isOpened():
@@ -13,11 +14,13 @@ if not cap.isOpened():
     exit()
 
 print("Press 'q' to exit the webcam feed.")
-print("Press 'Up Arrow' to increase focus.")
-print("Press 'Down Arrow' to decrease focus")
-print("-------------- CAP SETTING --------------")
-print("AUTO FOCUS : ", cap.get(cv2.CAP_PROP_AUTOFOCUS))
-print("FOCUS : ", cap.get(cv2.CAP_PROP_FOCUS))
+
+# Create a window to display the video focus
+cv2.namedWindow(NAMED_WINDOW)
+
+# Create a tracbar (slider) to control focus
+# The tracbar will range from 0 to 255
+cv2.createTrackbar("Focus", NAMED_WINDOW, 0, 255, lambda x: None)
 
 while True:
     # Capture frame-by-frame from the webcam
@@ -28,8 +31,16 @@ while True:
         print("Failed to capture image from webcam.")
         break
 
+    # Get current position of trackbars
+    focus_value = cv2.getTrackbarPos("Focus", NAMED_WINDOW)
+    
+    # Update value following trackbars
+    cap.set(cv2.CAP_PROP_FOCUS, focus_value)
+
     # Find the barcodes in the image and decode each barcode
     barcodes = pyzbar.decode(frame)
+
+    barcode_found = False # Flag to track if barcode is detected
 
     # Loop over the detected barcodes
     for barcode in barcodes:
@@ -45,29 +56,28 @@ while True:
         text = "{} ({})".format(barcodeData, barcodeType)
         cv2.putText(frame, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 0, 255), 2)
+        
+        # Set the flag to True when a barcode is detected
+        barcode_found = True
 
         # Print the barcode type and data to the terminal
-        print("[INFO] Found {} barcode: {}".format(barcodeType, barcodeData))
+        # print("[INFO] Found {} barcode: {}".format(barcodeType, barcodeData))
+    
+    # If a barcode was found, display a success message
+    if barcode_found:
+        cv2.putText(frame, "Barcode Detected! Focus is good.", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                    1, (0, 255, 0), 2, cv2.LINE_AA)
+    else:
+        cv2.putText(frame, "No barcode detected.", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                    1, (0, 0, 255), 2, cv2.LINE_AA) 
 
     # Display the resulting frame with barcode annotations
-    cv2.imshow("Barcode Scanner", frame)
+    cv2.imshow(NAMED_WINDOW, frame)
 
     # Exit the loop if the user presses the 'q' key
     key = cv2.waitKey(1)
     if key == ord('q'):
         break
-    elif key == ord('w'): # Up Arrow Key (increase focus)
-        current_focus = update_focus
-        new_focus = min(current_focus + 10, 255) # Increase focus, max value is 255
-        update_focus = new_focus
-        cap.set(cv2.CAP_PROP_FOCUS, update_focus)
-        print("Increase focus from {} to {}.".format(current_focus, new_focus))
-    elif key == ord('s'): # Down Arroy key (decase focus)
-        current_focus = update_focus
-        new_focus = max(current_focus - 10, 0) # Decrease focus, max value is 255
-        update_focus = new_focus
-        cap.set(cv2.CAP_PROP_FOCUS, update_focus)
-        print("Decrease focus from {} to {}.".format(current_focus, new_focus))
 
 # Release the webcam and close all OpenCV windows
 cap.release()
