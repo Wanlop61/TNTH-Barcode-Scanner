@@ -10,17 +10,33 @@ class WebcamApp:
 
         # Create a Menu widget (Menu bar)
         self.menu_bar = Menu(self.root)
-
+    
         """ Create a menu options """
         # Create a File menu
         self.file_menu = Menu(self.menu_bar, tearoff=0)
+
+        # Create a Settings menu under the File menu
+        self.settings_menu = Menu(self.file_menu, tearoff=0)
+        self.settings_menu.add_command(label="Color")
+        self.file_menu.add_cascade(label="Settings", menu=self.settings_menu)
+
+        self.webcam_menu = Menu(self.menu_bar, tearoff=0)
         # Create the Auto Focus checkbutton, default state is 'on'
         self.auto_focus_var = IntVar(value=1)  # Set the default value to 1 (Auto Focus enabled)
-        self.file_menu.add_checkbutton(label="Auto Focus", onvalue=1, offvalue=0, command=self.toggle_auto_focus, variable=self.auto_focus_var)
+        self.webcam_menu.add_checkbutton(label="Auto Focus", onvalue=1, offvalue=0, command=self.toggle_auto_focus, variable=self.auto_focus_var)
+        self.file_menu.add_separator()
         self.file_menu.add_command(label="Exit", command=self.close)
+
+        # Create a Menu
+        self.templates_menu = Menu(self.menu_bar, tearoff=0)
+        self.templates_menu.add_command(label="Choose")
 
         # Add the 'File' menu to the menu bar
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
+        # Add the 'Webcam' menu to the menu bar
+        self.menu_bar.add_cascade(label="Webcam", menu=self.webcam_menu)
+        # Add the 'Templates' menu to the menu bar
+        self.menu_bar.add_cascade(label="Templates", menu=self.templates_menu)
 
         # Configure the window to use the menu bar
         self.root.config(menu=self.menu_bar)
