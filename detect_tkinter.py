@@ -2,7 +2,15 @@ import cv2
 from tkinter import *
 from PIL import Image, ImageTk
 from pyzbar import pyzbar
-
+"""
+# Pre-processing image for better decoding
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 110, 255, cv2.THRESH_TRUNC)
+            # Create a CLAHE object (Arguments are optional)
+            clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(8,8))
+            cl1 = clahe.apply(thresh)
+            frame = cl1
+"""
 class WebcamApp:
     def __init__(self, root):
         self.root = root
