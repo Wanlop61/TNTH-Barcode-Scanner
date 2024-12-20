@@ -1,20 +1,17 @@
 import cv2
 from tkinter import *
+from tkinter import messagebox
 from PIL import Image, ImageTk
 from pyzbar import pyzbar
-"""
-# Pre-processing image for better decoding
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            _, thresh = cv2.threshold(gray, 110, 255, cv2.THRESH_TRUNC)
-            # Create a CLAHE object (Arguments are optional)
-            clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(8,8))
-            cl1 = clahe.apply(thresh)
-            frame = cl1
-"""
+
 class WebcamApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Webcam Capture with Tkinter")
+        self.root.geometry('600x600')
+
+        """ Variables for functions """
+        self.CAP_INDEX = 0
 
         # Create a Menu widget (Menu bar)
         self.menu_bar = Menu(self.root)
@@ -58,19 +55,32 @@ class WebcamApp:
         self.focus_scale.set(0) # Initial focus value
         self.focus_scale.pack()
         
-        # Open the webcam (0 is the default camera)
-        self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        # Open the webcam
+        # self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        self.start_webcam()
 
         # Initial settings
         self.auto_focus = True
-        self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1) # Enable auto focus by default
 
         # Call the toggle_auto_focus method to hide the focus slider if autofocus is enabled
         self.toggle_auto_focus()
         
         # Start the video stream
         self.update_frame()
+
+    def start_webcam(self):
+        # Start the video stream
+        self.cap = cv2.VideoCapture(self.CAP_INDEX, cv2.CAP_DSHOW)
+        self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1) # Enable auto focus by default
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 800)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 800)
     
+    def reconnect_webcam(self):
+        print("Attempting to reconnect to the webcam...")
+        self.root.title("Attempting to reconnect to the webcam...")
+        self.cap.release()
+        self.start_webcam()
+
     def toggle_auto_focus(self):
         """ Toggle the auto focus setting """
         self.auto_focus = self.auto_focus_var.get() == 1
@@ -87,14 +97,26 @@ class WebcamApp:
         if not self.auto_focus:  # Only adjust focus if autofocus is off
             self.cap.set(cv2.CAP_PROP_FOCUS, int(val))
 
+    def preprocess_image(self, frame):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+        _, thresh = cv2.threshold(blurred, 100, 255, cv2.THRESH_TRUNC)
+        # clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(8,8))
+        # cl1 = clahe.apply(thresh)
+        return thresh
 
     def update_frame(self):
         """Capture and display each frame from the webcam."""
         ret, frame = self.cap.read()
-        
+
         if ret:
+            self.root.title("Webcam Capture with Tkinter")
+            # Pre-processing image for better decoding
+            morph = self.preprocess_image(frame)
+            cv2.imshow("Processing Image", morph)
+          
             # Find the barcodes in the image and decode each barcode
-            barcodes = pyzbar.decode(frame)
+            barcodes = pyzbar.decode(morph)
 
             # Loop over the detected barcodes
             for barcode in barcodes:
@@ -122,13 +144,17 @@ class WebcamApp:
             # Update the label with the new image
             self.video_label.config(image=img_tk)
             self.video_label.image = img_tk
-        
-        # Call the method again after 10ms to update the frame
-        self.root.after(10, self.update_frame)
+
+            # Call the method again after 10ms to update the frame
+            # self.root.after(50, self.update_frame)
+        else:
+            self.reconnect_webcam()
+
+        self.root.after(50, self.update_frame)
 
     def close(self):
         """Release the webcam and close the tkinter window."""
-        self.cap.release()
+        # self.cap.release()
         self.root.quit()
 
 def main():
@@ -137,7 +163,7 @@ def main():
     
     # Ensure the window closes properly
     root.protocol("WM_DELETE_WINDOW", app.close)
-    
+
     root.mainloop()
 
 if __name__ == "__main__":
