@@ -1,50 +1,19 @@
 import cv2
 from tkinter import *
-from tkinter import messagebox
 from PIL import Image, ImageTk
 from pyzbar import pyzbar
+import easyocr
+import time
 
 class WebcamApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Webcam Capture with Tkinter")
-        self.root.geometry('600x600')
+        # self.root.geometry('800x800')
 
-        """ Variables for functions """
+        self.reader = easyocr.Reader(['en'])
         self.CAP_INDEX = 0
-
-        # Create a Menu widget (Menu bar)
-        self.menu_bar = Menu(self.root)
-    
-        """ Create a menu options """
-        # Create a File menu
-        self.file_menu = Menu(self.menu_bar, tearoff=0)
-
-        # Create a Settings menu under the File menu
-        self.settings_menu = Menu(self.file_menu, tearoff=0)
-        self.settings_menu.add_command(label="Color")
-        self.file_menu.add_cascade(label="Settings", menu=self.settings_menu)
-
-        self.webcam_menu = Menu(self.menu_bar, tearoff=0)
-        # Create the Auto Focus checkbutton, default state is 'on'
-        self.auto_focus_var = IntVar(value=1)  # Set the default value to 1 (Auto Focus enabled)
-        self.webcam_menu.add_checkbutton(label="Auto Focus", onvalue=1, offvalue=0, command=self.toggle_auto_focus, variable=self.auto_focus_var)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="Exit", command=self.close)
-
-        # Create a Menu
-        self.templates_menu = Menu(self.menu_bar, tearoff=0)
-        self.templates_menu.add_command(label="Choose")
-
-        # Add the 'File' menu to the menu bar
-        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
-        # Add the 'Webcam' menu to the menu bar
-        self.menu_bar.add_cascade(label="Webcam", menu=self.webcam_menu)
-        # Add the 'Templates' menu to the menu bar
-        self.menu_bar.add_cascade(label="Templates", menu=self.templates_menu)
-
-        # Configure the window to use the menu bar
-        self.root.config(menu=self.menu_bar)
+        self.initialize_menu()
         
         # Create a Label widget to display the webcam feed
         self.video_label = Label(root)
@@ -56,24 +25,41 @@ class WebcamApp:
         self.focus_scale.pack()
         
         # Open the webcam
-        # self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.start_webcam()
-
-        # Initial settings
-        self.auto_focus = True
 
         # Call the toggle_auto_focus method to hide the focus slider if autofocus is enabled
         self.toggle_auto_focus()
         
         # Start the video stream
         self.update_frame()
+    
+    def initialize_menu(self):
+        menu_bar = Menu(self.root)
+
+        # Create a File menu
+        file_menu = Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.close)
+        
+        # Create a Webcam menu
+        webcam_menu = Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Webcam", menu=webcam_menu)
+        # self.auto_focus = True
+        self.auto_focus = IntVar(value=1)
+        webcam_menu.add_checkbutton(label="Auto Focus", onvalue=1, offvalue=0, command=self.toggle_auto_focus, variable=self.auto_focus)
+        
+        # Display menu
+        self.root.config(menu=menu_bar)
+        
 
     def start_webcam(self):
         # Start the video stream
-        self.cap = cv2.VideoCapture(self.CAP_INDEX, cv2.CAP_DSHOW)
+        self.cap = cv2.VideoCapture(self.CAP_INDEX)
         self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1) # Enable auto focus by default
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 800)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 800)
+        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 400)
+        # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 400)
+        print(f"Webcam {self.CAP_INDEX} resolution: {int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))}x{int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}")
     
     def reconnect_webcam(self):
         print("Attempting to reconnect to the webcam...")
@@ -83,8 +69,8 @@ class WebcamApp:
 
     def toggle_auto_focus(self):
         """ Toggle the auto focus setting """
-        self.auto_focus = self.auto_focus_var.get() == 1
-        if self.auto_focus:
+        auto_focus = self.auto_focus.get() == 1
+        if auto_focus:
             self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)  # Enable autofocus
             self.focus_scale.set(0)  # Reset scale to 0 when auto-focus is on
             self.focus_scale.pack_forget()  # Hide the scale widget when autofocus is on
@@ -93,7 +79,6 @@ class WebcamApp:
             self.focus_scale.pack()  # Show the scale widget when autofocus is off
     
     def update_focus(self, val):
-        """Callback function for scale to update the focus."""
         if not self.auto_focus:  # Only adjust focus if autofocus is off
             self.cap.set(cv2.CAP_PROP_FOCUS, int(val))
 
@@ -104,6 +89,58 @@ class WebcamApp:
         # clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(8,8))
         # cl1 = clahe.apply(thresh)
         return thresh
+    
+    def draw_ocr_area(self, frame):
+        # Get the dimension of the image
+        height, width = frame.shape[:2]  # Unpack to 2 variables (height, width)
+        
+        # Define the size of the rectangle (width and height)
+        rect_width = width * 40 // 100
+        rect_height = height * 30 // 100
+        
+        # Calculate the center of the frame
+        center_x, center_y = width // 2, height // 2
+        
+        # Calculate the top-left corner of the rectangle
+        top_left_x = center_x - rect_width // 2
+        top_left_y = center_y - rect_height // 2
+        
+        # Calculate the bottom-right corner of the rectangle
+        bottom_right_x = center_x + rect_width // 2
+        bottom_right_y = center_y + rect_height // 2
+        
+        # Draw the rectangle at the center of the frame
+        cv2.rectangle(frame, (top_left_x, top_left_y), (bottom_right_x, bottom_right_y), (0, 0, 255), 2)
+        
+        # Return the frame and the rectangle coordinates
+        return frame, (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
+
+    def perform_ocr(self, frame, reader, bbox):
+        # Crop the region of interest (ROI) inside the rectangle using bbox coordinates
+        roi = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+        
+        # Perform OCR on the cropped region
+        results = reader.readtext(roi)
+        
+        # Iterate over the result to draw bounding boxes and add text
+        for (coord, text, prob) in results:
+            (top_left, top_right, bottom_right, bottom_left) = coord
+            tx, ty = (int(top_left[0]), int(top_left[1]))
+            bx, by = (int(bottom_right[0]), int(bottom_right[1]))
+
+            # Adjust coordinates for the main frame (since OCR is done on the cropped ROI)
+            tx += bbox[0]  # Offset by the x-coordinate of the bounding box
+            ty += bbox[1]  # Offset by the y-coordinate of the bounding box
+            bx += bbox[0]
+            by += bbox[1]
+
+            # Draw a rectangle around the detected text in the original frame
+            cv2.rectangle(frame, (tx, ty), (bx, by), (0, 255, 0), 2)
+
+            # Put the detected text on the image
+            cv2.putText(frame, text, (tx, ty - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        return frame
 
     def update_frame(self):
         """Capture and display each frame from the webcam."""
@@ -111,13 +148,17 @@ class WebcamApp:
 
         if ret:
             self.root.title("Webcam Capture with Tkinter")
+            bbox = self.draw_ocr_area(frame)[1]
+
             # Pre-processing image for better decoding
             morph = self.preprocess_image(frame)
-            cv2.imshow("Processing Image", morph)
+            # cv2.imshow("Processing Image", morph)
           
             # Find the barcodes in the image and decode each barcode
             barcodes = pyzbar.decode(morph)
-
+            if barcodes:
+                frame = self.perform_ocr(frame, self.reader, bbox)
+        
             # Loop over the detected barcodes
             for barcode in barcodes:
                 # Extract the bounding box location of the barcode and draw a bounding box around the barcode
@@ -145,16 +186,13 @@ class WebcamApp:
             self.video_label.config(image=img_tk)
             self.video_label.image = img_tk
 
-            # Call the method again after 10ms to update the frame
-            # self.root.after(50, self.update_frame)
         else:
             self.reconnect_webcam()
 
-        self.root.after(50, self.update_frame)
+        self.root.after(100, self.update_frame)
 
     def close(self):
-        """Release the webcam and close the tkinter window."""
-        # self.cap.release()
+        self.cap.release()
         self.root.quit()
 
 def main():
